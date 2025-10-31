@@ -41,7 +41,7 @@ pipeline {
 
                         // --- Checkout ---
                         checkout scm
-                        echo "Code source récupéré ✅"
+                        echo "Code source récupéré "
 
                         // --- Tests Automatisés ---
                         sh 'mvn clean verify'
@@ -101,7 +101,7 @@ pipeline {
                         slackSend(
                             channel: env.SLACK_CHANNEL,
                             color: 'good',   // vert
-                            message: "✅ Pipeline réussie pour ${env.BRANCH_NAME} (#${env.BUILD_NUMBER})"
+                            message: "Pipeline réussie pour ${env.BRANCH_NAME} (#${env.BUILD_NUMBER})"
                         )
 
                     } catch (Exception e) {
@@ -109,7 +109,7 @@ pipeline {
                         slackSend(
                             channel: env.SLACK_CHANNEL,
                             color: 'danger', // rouge
-                            message: "❌ Pipeline échouée pour ${env.BRANCH_NAME} (#${env.BUILD_NUMBER})\nErreur: ${e}"
+                            message: "Pipeline échouée pour ${env.BRANCH_NAME} (#${env.BUILD_NUMBER})\nErreur: ${e}"
                         )
                         error("Pipeline échouée: ${e}")
                     } finally {
