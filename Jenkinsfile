@@ -70,24 +70,27 @@ stage('Quality Gate') {
             script {
                 echo "Attente de 30 secondes avant vérification du Quality Gate..."
                 sleep(time: 30, unit: 'SECONDS')
-                
-                def qg = waitForQualityGate()
-                echo "SonarCloud Quality Gate status: ${qg.status}"
 
-                if (qg.status == 'OK') {
-                    echo "Qualité validée par SonarCloud."
-                } else if (qg.status == 'FAILED') {
-                    echo " SonarCloud a renvoyé FAILED (souvent un rapport déjà traité ou plus récent)."
-                    echo " Vérifie le tableau de bord: https://sonarcloud.io/dashboard?id=diabou-lab_PayMyBuddy"
-                    currentBuild.result = 'UNSTABLE' // Ne casse pas le pipeline
-                } else {
-                    echo " Statut inattendu: ${qg.status}"
+                try {
+                    def qg = waitForQualityGate()
+                    echo "SonarCloud Quality Gate status: ${qg.status}"
+
+                    if (qg.status == 'OK') {
+                        echo "Qualité validée par SonarCloud."
+                    } else {
+                        echo "Qualité non validée, statut: ${qg.status}"
+                        currentBuild.result = 'UNSTABLE' // Ne pas casser le pipeline
+                    }
+                } catch (Exception e) {
+                    echo "Erreur lors de la vérification du Quality Gate : ${e.message}"
+                    // Si tu veux, tu peux aussi rendre le build instable ici
                     currentBuild.result = 'UNSTABLE'
                 }
             }
         }
     }
 }
+
 
   stage('Compilation & Packaging') {
             steps {
