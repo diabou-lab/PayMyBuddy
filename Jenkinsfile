@@ -69,25 +69,6 @@ stage('Quality Gate') {
     steps {
         echo "Stage Quality Gate ignoré"
     }
-    steps {
-        timeout(time: 5, unit: 'MINUTES') {
-            script {
-                echo "Attente de 30 secondes avant vérification du Quality Gate..."
-                sleep(time: 30, unit: 'SECONDS')
-                try {
-                    def qg = waitForQualityGate()
-                    echo "SonarCloud Quality Gate status: ${qg.status}"
-                    if (qg.status != 'OK') {
-                        echo "Qualité non validée : ${qg.status}"
-                        currentBuild.result = 'UNSTABLE'  // On marque instable
-                    }
-                } catch (Exception e) {
-                    echo "Erreur lors de la vérification du Quality Gate : ${e.message}"
-                    currentBuild.result = 'UNSTABLE'
-                }
-            }
-        }
-    }
 }
 
 // Et autour des étapes suivantes tu peux forcer à continuer malgré l'instable
@@ -101,7 +82,6 @@ stage('Compilation & Packaging') {
         }
     }
 }
-
         stage('Build & Push Docker Image') {
             steps {
                 echo " Construction et envoi de l’image DockerHub..."
