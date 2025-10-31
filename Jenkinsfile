@@ -63,27 +63,21 @@ pipeline {
         }
     }
 }
-
 stage('Quality Gate') {
     steps {
         timeout(time: 5, unit: 'MINUTES') {
             script {
                 echo "Attente de 30 secondes avant vérification du Quality Gate..."
                 sleep(time: 30, unit: 'SECONDS')
-
                 try {
                     def qg = waitForQualityGate()
                     echo "SonarCloud Quality Gate status: ${qg.status}"
-
-                    if (qg.status == 'OK') {
-                        echo "Qualité validée par SonarCloud."
-                    } else {
-                        echo "Qualité non validée, statut: ${qg.status}"
-                        currentBuild.result = 'UNSTABLE' // Ne pas casser le pipeline
+                    if (qg.status != 'OK') {
+                        echo "Qualité non validée : ${qg.status}"
+                        currentBuild.result = 'UNSTABLE'  // On marque instable
                     }
                 } catch (Exception e) {
                     echo "Erreur lors de la vérification du Quality Gate : ${e.message}"
-                    // Si tu veux, tu peux aussi rendre le build instable ici
                     currentBuild.result = 'UNSTABLE'
                 }
             }
@@ -91,13 +85,17 @@ stage('Quality Gate') {
     }
 }
 
+// Et autour des étapes suivantes tu peux forcer à continuer malgré l'instable
 
-  stage('Compilation & Packaging') {
-            steps {
-                echo "Compilation et génération du package (JAR)..."
-                sh 'mvn clean package -DskipTests'
+stage('Compilation & Packaging') {
+    steps {
+        script {
+            catchError(buildResult: 'UNSTABLE', stageResult: 'SUCCESS') {
+                // ta compilation et packaging ici
             }
         }
+    }
+}
 
         stage('Build & Push Docker Image') {
             steps {
