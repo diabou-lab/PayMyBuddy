@@ -185,4 +185,4 @@ pipeline {
             echo "Fin du pipeline Jenkins."
         }
     }
-}
+
