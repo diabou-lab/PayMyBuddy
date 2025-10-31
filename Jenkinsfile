@@ -56,7 +56,7 @@ pipeline {
                   -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                   -Dsonar.organization=${SONAR_ORG} \
                   -Dsonar.host.url=https://sonarcloud.io \
-                  -Dsonar.login=${SONAR_TOKEN}
+                  -Dsonar.login=${SONAR_TOKEN} \
                   -Dsonar.projectVersion=${BUILD_NUMBER} \
                   -Dsonar.analysis.buildNumber=${BUILD_NUMBER}
             '''
