@@ -63,18 +63,19 @@ pipeline {
             }
         }
 
-        stage('Quality Gate') {
+       stage('Quality Gate') {
     steps {
         timeout(time: 2, unit: 'MINUTES') {
             script {
                 def qg = waitForQualityGate()
                 if (qg.status != 'OK') {
-                    echo "Quality Gate failed: ${qg.status}. Ignoring failure temporarily."
+                    echo "Quality Gate failed: ${qg.status}. Pipeline continues."
                 }
             }
         }
     }
 }
+
         stage('Compilation & Packaging') {
             steps {
                 echo "Compilation et génération du package (JAR)..."
