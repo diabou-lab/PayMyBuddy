@@ -95,6 +95,81 @@ pipeline {
                 }
             }
         }
+    // --- Étape Review (uniquement pour les branches ≠ main) ---
+        stage('Déploiement Review') {
+            when {
+                not { branch 'main' }
+            }
+            steps {
+                echo "Déploiement en environnement Review (${REVIEW_SERVER})..."
+                sshagent (credentials: ['deployapp']) {
+                    sh """
+                    ssh ${DEPLOY_USER}@${REVIEW_SERVER} "which docker || (curl -fsSL https://get.docker.com | sh)"
+                    ssh ${DEPLOY_USER}@${REVIEW_SERVER} "docker pull ${DOCKER_IMAGE}"
+                    ssh ${DEPLOY_USER}@${REVIEW_SERVER} "docker stop review-app || true && docker rm review-app || true"
+                    ssh ${DEPLOY_USER}@${REVIEW_SERVER} "docker run -d --name review-app -p 8082:8080 ${DOCKER_IMAGE}"
+                    """
+                }
+            }
+        }
+
+        // --- Étape Staging (uniquement sur main) ---
+        stage('Déploiement Staging') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo " Déploiement en pré-production (${STAGING_SERVER})..."
+                sshagent (credentials: ['deployapp']) {
+                    sh """
+                    ssh ${DEPLOY_USER}@${STAGING_SERVER} "which docker || (curl -fsSL https://get.docker.com | sh)"
+                    ssh ${DEPLOY_USER}@${STAGING_SERVER} "docker pull ${DOCKER_IMAGE}"
+                    ssh ${DEPLOY_USER}@${STAGING_SERVER} "docker stop staging-app || true && docker rm staging-app || true"
+                    ssh ${DEPLOY_USER}@${STAGING_SERVER} "docker run -d --name staging-app -p 8081:8080 ${DOCKER_IMAGE}"
+                    """
+                }
+            }
+        }
+
+        stage('Validation Staging') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo "Vérification du déploiement en staging..."
+                sh "curl -f http://${STAGING_SERVER}:8081/actuator/health"
+            }
+        }
+
+        // --- Étape Production ---
+        stage('Déploiement Production') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo " Déploiement final en production (${PROD_SERVER})..."
+                sshagent (credentials: ['deployapp']) {
+                    sh """
+                    ssh ${DEPLOY_USER}@${PROD_SERVER} "which docker || (curl -fsSL https://get.docker.com | sh)"
+                    ssh ${DEPLOY_USER}@${PROD_SERVER} "docker pull ${DOCKER_IMAGE}"
+                    ssh ${DEPLOY_USER}@${PROD_SERVER} "docker stop prod-app || true && docker rm prod-app || true"
+                    ssh ${DEPLOY_USER}@${PROD_SERVER} "docker run -d --name prod-app -p 8080:8080 ${DOCKER_IMAGE}"
+                    """
+                }
+            }
+        }
+
+        stage('Validation Production') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo "Vérification du déploiement en production..."
+                sh "curl -f http://${PROD_SERVER}:8080/actuator/health"
+            }
+        }
+    }
+
     }
 
     post {
