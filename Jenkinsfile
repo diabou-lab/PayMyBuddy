@@ -72,7 +72,6 @@ stage('Quality Gate') {
 }
 
 // Et autour des étapes suivantes tu peux forcer à continuer malgré l'instable
-
 stage('Compilation & Packaging') {
     steps {
         script {
