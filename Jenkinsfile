@@ -24,168 +24,111 @@ pipeline {
         DEPLOY_USER = 'ubuntu'
     }
 
-    options {
-        timestamps()
-    }
+    options { timestamps() }
 
     stages {
-        stage('Install Docker CLI') {
-            steps {
-                echo "Installation de Docker CLI..."
-                sh '''
-                    apt-get update -o Acquire::Check-Valid-Until=false -o Acquire::Check-Date=false
-                    apt-get install -y docker.io
-                    docker --version
-                '''
-            }
-        }
-
-        stage('Checkout') {
-            steps {
-                checkout scm
-                echo "Code source récupéré ✅"
-            }
-        }
-
-        stage('Tests Automatisés') {
-            steps {
-                sh 'mvn clean verify'
-            }
-        }
-
-        stage('Analyse SonarCloud') {
-            steps {
-                withSonarQubeEnv('SonarCloud') {
-                    sh '''
-                        mvn sonar:sonar \
-                          -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                          -Dsonar.organization=${SONAR_ORG} \
-                          -Dsonar.host.url=https://sonarcloud.io \
-                          -Dsonar.login=${SONAR_TOKEN}
-                    '''
-                }
-            }
-        }
-
-        stage('Quality Gate') {
-            when { expression { false } } // ignoré
-            steps {
-                echo "Stage Quality Gate ignoré"
-            }
-        }
-
-        stage('Compilation & Packaging') {
+        stage('Pipeline Principal') {
             steps {
                 script {
-                    catchError(buildResult: 'UNSTABLE', stageResult: 'SUCCESS') {
-                        sh 'mvn clean package -DskipTests'
+                    try {
+                        // --- Installation Docker CLI ---
+                        echo "Installation de Docker CLI..."
+                        sh '''
+                            apt-get update -o Acquire::Check-Valid-Until=false -o Acquire::Check-Date=false
+                            apt-get install -y docker.io
+                            docker --version
+                        '''
+
+                        // --- Checkout ---
+                        checkout scm
+                        echo "Code source récupéré ✅"
+
+                        // --- Tests Automatisés ---
+                        sh 'mvn clean verify'
+
+                        // --- Analyse SonarCloud ---
+                        withSonarQubeEnv('SonarCloud') {
+                            sh """
+                                mvn sonar:sonar \
+                                  -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                                  -Dsonar.organization=${SONAR_ORG} \
+                                  -Dsonar.host.url=https://sonarcloud.io \
+                                  -Dsonar.login=${SONAR_TOKEN}
+                            """
+                        }
+
+                        // --- Compilation & Packaging ---
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'SUCCESS') {
+                            sh 'mvn clean package -DskipTests'
+                        }
+
+                        // --- Build & Push Docker Image ---
+                        sh """
+                            docker login -u ${DOCKERHUB_CREDENTIALS_USR} -p ${DOCKERHUB_CREDENTIALS_PSW}
+                            docker build -t ${DOCKER_IMAGE} .
+                            docker push ${DOCKER_IMAGE}
+                        """
+
+                        // --- Déploiements selon les branches ---
+                        sh 'apt-get install -y openssh-client'
+
+                        if (env.BRANCH_NAME != 'main') {
+                            echo "Déploiement Review..."
+                            deployServer(env.REVIEW_SERVER, 'review-app', 8082)
+                        } else {
+                            echo "Déploiement Staging..."
+                            deployServer(env.STAGING_SERVER, 'staging-app', 8081)
+                            echo "Validation Staging..."
+                            sh """
+                                until curl -sf http://${STAGING_SERVER}:8081/actuator/health; do
+                                    echo "En attente du démarrage..."
+                                    sleep 5
+                                done
+                            """
+
+                            echo "Déploiement Production..."
+                            deployServer(env.PROD_SERVER, 'prod-app', 8080)
+                            echo "Validation Production..."
+                            sh """
+                                until curl -sf http://${PROD_SERVER}:8080/actuator/health; do
+                                    echo "En attente du démarrage..."
+                                    sleep 5
+                                done
+                            """
+                        }
+
+                        // --- Notification Slack succès ---
+                        slackSend(
+                            channel: env.SLACK_CHANNEL,
+                            color: 'good',   // vert
+                            message: "✅ Pipeline réussie pour ${env.BRANCH_NAME} (#${env.BUILD_NUMBER})"
+                        )
+
+                    } catch (Exception e) {
+                        // --- Notification Slack échec ---
+                        slackSend(
+                            channel: env.SLACK_CHANNEL,
+                            color: 'danger', // rouge
+                            message: "❌ Pipeline échouée pour ${env.BRANCH_NAME} (#${env.BUILD_NUMBER})\nErreur: ${e}"
+                        )
+                        error("Pipeline échouée: ${e}")
+                    } finally {
+                        echo "Fin du pipeline Jenkins."
                     }
                 }
             }
         }
-
-        stage('Build & Push Docker Image') {
-            steps {
-                script {
-                    sh '''
-                        docker login -u ${DOCKERHUB_CREDENTIALS_USR} -p ${DOCKERHUB_CREDENTIALS_PSW}
-                        docker build -t ${DOCKER_IMAGE} .
-                        docker push ${DOCKER_IMAGE}
-                    '''
-                }
-            }
-        }
-    // --- Étape Review (uniquement pour les branches ≠ main) ---
-        stage('Déploiement Review') {
-            when {
-                not { branch 'main' }
-            }
-            steps {
-                sh 'apt-get install -y openssh-client'
-                echo "Déploiement en environnement Review (${REVIEW_SERVER})..."
-                sshagent (credentials: ['deployapp']) {
-                    sh """
-                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${REVIEW_SERVER} "which docker || (curl -fsSL https://get.docker.com | sh)"
-                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${REVIEW_SERVER} "docker pull ${DOCKER_IMAGE}"
-                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${REVIEW_SERVER} "docker stop review-app || true && docker rm review-app || true"
-                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${REVIEW_SERVER} "docker run -d --name review-app -p 8082:8080 ${DOCKER_IMAGE}"
-                    """
-                }
-            }
-        }
-
-        // --- Étape Staging (uniquement sur main) ---
-        stage('Déploiement Staging') {
-            when {
-                branch 'main'
-            }
-            steps {
-                sh 'apt-get install -y openssh-client'
-                echo " Déploiement en pré-production (${STAGING_SERVER})..."
-                sshagent (credentials: ['deployapp']) {
-                    sh """
-                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${STAGING_SERVER} "which docker || (curl -fsSL https://get.docker.com | sh)"
-                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${STAGING_SERVER} "docker pull ${DOCKER_IMAGE}"
-                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${STAGING_SERVER} "docker stop staging-app || true && docker rm staging-app || true"
-                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${STAGING_SERVER} "docker run -d --name staging-app -p 8081:8080 ${DOCKER_IMAGE}"
-                    """
-                }
-            }
-        }
-
-        stage('Validation Staging') {
-            when {
-                branch 'main'
-            }
-            steps {
-                echo "Vérification du déploiement en staging..."
-                sh "curl -f http://${STAGING_SERVER}:8081/actuator/health"
-            }
-        }
-
-        // --- Étape Production ---
-        stage('Déploiement Production') {
-            when {
-                branch 'main'
-            }
-            steps {
-                sh 'apt-get install -y openssh-client'
-                echo " Déploiement final en production (${PROD_SERVER})..."
-                sshagent (credentials: ['deployapp']) {
-                    sh """
-                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${PROD_SERVER} "which docker || (curl -fsSL https://get.docker.com | sh)"
-                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${PROD_SERVER} "docker pull ${DOCKER_IMAGE}"
-                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${PROD_SERVER} "docker stop prod-app || true && docker rm prod-app || true"
-                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${PROD_SERVER} "docker run -d --name prod-app -p 8080:8080 ${DOCKER_IMAGE}"
-                    """
-                }
-            }
-        }
-
-        stage('Validation Production') {
-            when {
-                branch 'main'
-            }
-            steps {
-                echo "Vérification du déploiement en production..."
-                sh "curl -f http://${PROD_SERVER}:8080/actuator/health"
-            }
-        }
     }
+}
 
+// --- Fonctions globales ---
+def deployServer(String server, String containerName, int port) {
+    sshagent (credentials: ['deployapp']) {
+        sh """
+        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${server} "command -v docker || (curl -fsSL https://get.docker.com | sh)"
+        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${server} "docker pull ${DOCKER_IMAGE}"
+        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${server} "docker stop ${containerName} || true && docker rm ${containerName} || true"
+        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${server} "docker run -d --name ${containerName} -p ${port}:8080 ${DOCKER_IMAGE}"
+        """
     }
-
-    post {
-        success {
-            echo "✅ Pipeline réussie !"
-            slackSend(channel: env.SLACK_CHANNEL, message: "✅ Pipeline réussie pour ${env.BRANCH_NAME} (#${env.BUILD_NUMBER})")
-        }
-        failure {
-            echo "❌ Pipeline échouée."
-            slackSend(channel: env.SLACK_CHANNEL, message: "❌ Pipeline échouée pour ${env.BRANCH_NAME} (#${env.BUILD_NUMBER})")
-        }
-        always {
-            echo "Fin du pipeline Jenkins."
-        }
-    }
-
+}
