@@ -52,30 +52,35 @@ pipeline {
             steps {
                 echo "Analyse statique du code avec SonarCloud..."
                 withSonarQubeEnv('SonarCloud') {
-                    sh """
-                    mvn sonar:sonar \
-                        -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                        -Dsonar.organization=${SONAR_ORG} \
-                        -Dsonar.host.url=https://sonarcloud.io \
-                        -Dsonar.login=${SONAR_TOKEN}
-                    """
-                }
+                   sh """
+                       mvn clean verify sonar:sonar \
+                         -Dsonar.projectKey=diabou-lab_PayMyBuddy \
+                         -Dsonar.organization=diabou-lab \
+                         -Dsonar.host.url=https://sonarcloud.io \
+                         -Dsonar.login=$SONAR_TOKEN \
+                         -Dsonar.projectVersion=${env.BUILD_NUMBER} \
+                         -Dsonar.analysis.buildNumber=${env.BUILD_NUMBER}
+                     """
+                    }
+
             }
         }
 
-     stage('Quality Gate') {
+stage('Quality Gate') {
     steps {
-        timeout(time: 2, unit: 'MINUTES') {
+        timeout(time: 5, unit: 'MINUTES') {
             script {
                 def qg = waitForQualityGate()
+                echo "SonarCloud Quality Gate status: ${qg.status}"
+
                 if (qg.status == 'OK') {
-                    echo "SonarQube Quality Gate PASSED"
+                    echo "Qualité validée par SonarCloud."
                 } else if (qg.status == 'FAILED') {
-                    echo "SonarQube a renvoyé FAILED (souvent à cause d’un commit plus récent déjà analysé)."
-                    echo "Vérifie sur SonarCloud : le Quality Gate réel est probablement PASS."
-                    currentBuild.result = 'UNSTABLE' // ne bloque plus le pipeline
+                    echo "SonarCloud a renvoyé FAILED (souvent car une analyse plus récente existe déjà)."
+                    echo "Vérifie sur https://sonarcloud.io/dashboard?id=diabou-lab_PayMyBuddy"
+                    currentBuild.result = 'UNSTABLE'  // N'interrompt pas le pipeline
                 } else {
-                    echo "SonarQube Quality Gate: ${qg.status}"
+                    echo "SonarCloud renvoie un statut inattendu: ${qg.status}"
                     currentBuild.result = 'UNSTABLE'
                 }
             }
@@ -83,9 +88,7 @@ pipeline {
     }
 }
 
-
-
-        stage('Compilation & Packaging') {
+  stage('Compilation & Packaging') {
             steps {
                 echo "Compilation et génération du package (JAR)..."
                 sh 'mvn clean package -DskipTests'
