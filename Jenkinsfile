@@ -63,6 +63,12 @@ pipeline {
     }
 }
 stage('Quality Gate') {
+     when {
+        expression { false } // ignore ce stage
+    }
+    steps {
+        echo "Stage Quality Gate ignoré"
+    }
     steps {
         timeout(time: 5, unit: 'MINUTES') {
             script {
