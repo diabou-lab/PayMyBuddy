@@ -68,6 +68,9 @@ stage('Quality Gate') {
     steps {
         timeout(time: 5, unit: 'MINUTES') {
             script {
+                echo "Attente de 30 secondes avant vérification du Quality Gate..."
+                sleep(time: 30, unit: 'SECONDS')
+                
                 def qg = waitForQualityGate()
                 echo "SonarCloud Quality Gate status: ${qg.status}"
 
