@@ -63,18 +63,23 @@ pipeline {
             }
         }
 
-       stage('Quality Gate') {
+      stage('Quality Gate') {
     steps {
         timeout(time: 2, unit: 'MINUTES') {
             script {
                 def qg = waitForQualityGate()
-                if (qg.status != 'OK') {
-                    echo "Quality Gate failed: ${qg.status}. Pipeline continues."
+                if (qg.status == 'FAILED' && qg.outcomeDescription?.contains("newer report")) {
+                    echo "Ignored: SonarCloud refused this analysis because a newer one already exists."
+                } else if (qg.status != 'OK') {
+                    error "Quality Gate failed: ${qg.status}"
+                } else {
+                    echo "Quality Gate passed."
                 }
             }
         }
     }
 }
+
 
         stage('Compilation & Packaging') {
             steps {
