@@ -11,7 +11,7 @@ pipeline {
         SONAR_TOKEN = credentials('sonarcloud-token')
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         SSH_KEY = credentials('deployapp')
-        SLACK_CHANNEL = '#jenkins-notifications'
+        SLACK_CHANNEL = '#jenkins-eazytrainingdiabou'
 
         // Configuration Sonar & Docker
         SONAR_PROJECT_KEY = 'diabou-lab_PayMyBuddy'
