@@ -166,8 +166,7 @@ stage('Compilation & Packaging') {
             }
         }
     }
-
-    post {
+post {
         success {
             echo "Pipeline réussie !"
             slackSend(channel: "${SLACK_CHANNEL}", message: " Pipeline réussie pour ${env.BRANCH_NAME} (#${env.BUILD_NUMBER})")
