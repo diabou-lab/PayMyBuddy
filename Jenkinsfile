@@ -80,18 +80,16 @@ stage('Compilation & Packaging') {
         }
     }
 }
-        stage('Build & Push Docker Image') {
-            steps {
-                echo " Construction et envoi de l’image DockerHub..."
-                script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
-                        def app = docker.build(DOCKER_IMAGE)
-                        app.push()
-                    }
-                }
-            }
+    stage('Build & Push Docker Image') {
+    steps {
+        echo "Construction et envoi de l’image DockerHub..."
+        script {
+            sh "docker login -u ${DOCKERHUB_CREDENTIALS_USR} -p ${DOCKERHUB_CREDENTIALS_PSW} https://index.docker.io/v1/"
+            sh "docker build -t ${DOCKER_IMAGE} ."
+            sh "docker push ${DOCKER_IMAGE}"
         }
-
+    }
+}
         // --- Étape Review (uniquement pour les branches ≠ main) ---
         stage('Déploiement Review') {
             when {
