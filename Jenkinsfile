@@ -101,7 +101,7 @@ pipeline {
                 not { branch 'main' }
             }
             steps {
-                sh 'apt-get update && apt-get install -y openssh-client'
+                sh 'apt-get install -y openssh-client'
                 echo "Déploiement en environnement Review (${REVIEW_SERVER})..."
                 sshagent (credentials: ['deployapp']) {
                     sh """
@@ -120,7 +120,7 @@ pipeline {
                 branch 'main'
             }
             steps {
-                sh 'apt-get update && apt-get install -y openssh-client'
+                sh 'apt-get install -y openssh-client'
                 echo " Déploiement en pré-production (${STAGING_SERVER})..."
                 sshagent (credentials: ['deployapp']) {
                     sh """
@@ -149,7 +149,7 @@ pipeline {
                 branch 'main'
             }
             steps {
-                sh 'apt-get update && apt-get install -y openssh-client'
+                sh 'apt-get install -y openssh-client'
                 echo " Déploiement final en production (${PROD_SERVER})..."
                 sshagent (credentials: ['deployapp']) {
                     sh """
