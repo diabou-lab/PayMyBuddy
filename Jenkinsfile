@@ -48,23 +48,21 @@ pipeline {
             }
         }
 
-        stage('Vérification Qualité de Code') {
-            steps {
-                echo "Analyse statique du code avec SonarCloud..."
-                withSonarQubeEnv('SonarCloud') {
-                   sh """
-                       mvn clean verify sonar:sonar \
-                         -Dsonar.projectKey=diabou-lab_PayMyBuddy \
-                         -Dsonar.organization=diabou-lab \
-                         -Dsonar.host.url=https://sonarcloud.io \
-                         -Dsonar.login=$SONAR_TOKEN \
-                         -Dsonar.projectVersion=${env.BUILD_NUMBER} \
-                         -Dsonar.analysis.buildNumber=${env.BUILD_NUMBER}
-                     """
-                    }
-
-            }
+        stage('Analyse SonarCloud') {
+    steps {
+        withSonarQubeEnv('SonarCloud') {
+            sh '''
+                mvn clean verify sonar:sonar \
+                  -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                  -Dsonar.organization=${SONAR_ORG} \
+                  -Dsonar.host.url=https://sonarcloud.io \
+                  -Dsonar.login=${SONAR_TOKEN}
+                  -Dsonar.projectVersion=${BUILD_NUMBER} \
+                  -Dsonar.analysis.buildNumber=${BUILD_NUMBER}
+            '''
         }
+    }
+}
 
 stage('Quality Gate') {
     steps {
@@ -76,11 +74,11 @@ stage('Quality Gate') {
                 if (qg.status == 'OK') {
                     echo "Qualité validée par SonarCloud."
                 } else if (qg.status == 'FAILED') {
-                    echo "SonarCloud a renvoyé FAILED (souvent car une analyse plus récente existe déjà)."
-                    echo "Vérifie sur https://sonarcloud.io/dashboard?id=diabou-lab_PayMyBuddy"
-                    currentBuild.result = 'UNSTABLE'  // N'interrompt pas le pipeline
+                    echo " SonarCloud a renvoyé FAILED (souvent un rapport déjà traité ou plus récent)."
+                    echo " Vérifie le tableau de bord: https://sonarcloud.io/dashboard?id=diabou-lab_PayMyBuddy"
+                    currentBuild.result = 'UNSTABLE' // Ne casse pas le pipeline
                 } else {
-                    echo "SonarCloud renvoie un statut inattendu: ${qg.status}"
+                    echo " Statut inattendu: ${qg.status}"
                     currentBuild.result = 'UNSTABLE'
                 }
             }
