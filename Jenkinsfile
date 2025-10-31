@@ -1,10 +1,10 @@
 pipeline {
-    agent {
-    docker {
-        image 'maven:3.9.6-eclipse-temurin-17'
-        args '-v /var/run/docker.sock:/var/run/docker.sock'
+  agent {
+        docker {
+            image 'maven:3.9.6-eclipse-temurin-17'
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
     }
-}
     environment {
         // Credentials Jenkins
         SONAR_TOKEN = credentials('sonarcloud-token')
@@ -31,6 +31,14 @@ pipeline {
     }
 
     stages {
+        stage('Install Docker CLI') {
+            steps {
+                sh '''
+                    apt-get update && apt-get install -y docker.io
+                    docker --version
+                '''
+            }
+        }
 
         stage('Checkout') {
             steps {
