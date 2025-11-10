@@ -126,7 +126,7 @@ def deployServer(String server, String containerName, int port) {
         sh """
         ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${server} "command -v docker || (curl -fsSL https://get.docker.com | sh)"
         ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${server} "docker pull ${DOCKER_IMAGE}"
-        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${server} 
+        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${server} "docker stop ${containerName} || true && docker rm ${containerName} || true"
         ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${server} "docker run -d --name ${containerName} -p ${port}:8080 ${DOCKER_IMAGE}"
         """
     }
