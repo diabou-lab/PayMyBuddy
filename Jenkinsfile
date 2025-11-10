@@ -17,9 +17,9 @@ pipeline {
         APP_NAME = 'springboot-app'
         DOCKER_IMAGE = "diaboudoc/${APP_NAME}:${env.BUILD_NUMBER}"
 
-        REVIEW_SERVER = '34.224.99.183'
-        STAGING_SERVER = '54.86.117.55'
-        PROD_SERVER = '3.88.29.115'
+        REVIEW_SERVER = '98.94.6.240'
+        STAGING_SERVER = '54.197.32.145'
+        PROD_SERVER = '34.224.40.53'
 
         DEPLOY_USER = 'ubuntu'
     }
