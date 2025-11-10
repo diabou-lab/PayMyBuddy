@@ -11,7 +11,6 @@ pipeline {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         SSH_KEY = credentials('deployapp')
         SLACK_CHANNEL = '#jenkins-eazytrainingdiabou'
-
         SONAR_PROJECT_KEY = 'diabou-lab_PayMyBuddy'
         SONAR_ORG = 'diabou-lab'
         APP_NAME = 'springboot-app'
